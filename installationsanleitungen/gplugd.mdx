@@ -1,0 +1,424 @@
+---
+title: 'gPlugD'
+description: 'Die folgenden Informationen können Sie bei der Installation und Inbetriebnahme Ihres gPlugD unterstützen.'
+icon: 'text-size'
+---
+
+## Initiale Inbetriebnahme
+
+Auf dem gPlugD ist eine spezifische Firmware Version der Tasmota Software installiert.
+
+Wenn der gPlugD zum ersten Mal via seine USB-Buchse mit Energie versorgt wird, wird er einen offenen WiFi-Access Point mit einem eigenen SSID Namen bereit stellen (“gPlugD”).
+
+Verbinden Sie sich nun mit einem Webbrowser Ihres Wifi-Client (z.B. einem Notebook oder Smartphone) mit diesem Wifi-AP (192.168.4.1). Über das Web-UI des gPlugD können Sie Ihre Zugangsdaten zu Ihrem eigenen, lokalen Wifi-Netz eintragen. Nach dem “Speichern” wird sich der gPlugD mit diesem Wifi-Netz verbinden und erhält von Ihrem Wifi-Router eine IP Adresse zugewiesen. Um auf das Web-UI Ihres gPlugD zu gelangen, können Sie – dank dem Service mDNS – in Ihrem Webbrowser einfach “http://gPlugD.local/” anstelle der IP Adresse eingeben.
+
+Alle weiteren Konfigurationen können Sie via das web-UI des gPlugD vornehmen. Sie können nun auch ein zweites (Not-) WiFi-Netz (z.B. Ihren Handy Hotspot) konfigurieren oder das Web-UI mit einem Passwort schützen.
+
+Anschliessend kann der gPlugD durch das mitgelieferte Kabel mit der RJ12 Buchse der Smartmeter-Kundenschnittstelle verbunden werden. Sie können den gPlugD ohne [1] USB Energieversorgung direkt via das RJ12 Kabel mit Ihrem Smartmeter verbinden.
+
+[1] Einige VNB installieren ihren Kunden leider ISKRA AM550 SM ohne Energieversorgung durch die Kundenschnittstelle.
+
+
+
+## Konfigurationsscript
+
+Damit die von Ihrem Smart Meter (SM) übertragenen Energiedaten erkannt und auf dem Web-UI angezeigt werden, muss das Script mit den korrekten Definitionen des SM aktiviert sein.
+
+Ein Script für SM mit einer P1-DSMR Schnittstelle (ASCII, Mode-D) – wie beim ELSTER AS3000 – ist auf dem gPlugD vorinstalliert. Es kann ebenfalls für SM der Marke Ensor und Sagemcom sowie den E360 von L+G verwendet werden.
+
+Für ISKRA AM550 SM müssen Sie evtl. das Script des gPlug via Web-UI->Konsolen->Skript konfigurieren.
+
+- Sofern Ihr VNB ebenfalls dem DSMR Standard (ASCII, Mode-D) folgt, können Sie das P1-DSMR Script installiert lassen.
+- Kunden im Netz von Romande-Energie, SIL und SIE wählen “ISKRA-EXT“
+- Andere Kunden wählen “ISKRA-COMPACT“
+
+Die beiden ISKRA Scripts extrahieren die Werte aus einem binär übertragenen HDCL/DLMS Datentelegramm.
+
+Ihr VNB muss Ihnen auch mitteilen (StromVV Art 8a, Abs 1bis), welche Werte und in welchem Format, diese von Ihrem SM ausgegeben werden.
+
+Möglicherweise müssen Sie im Script Anpassungen vornehmen. Sie können zum Beispiel Zeilen entfernen, sofern Ihr VNB diese OBIS Werte nicht liefert oder andere hinzu fügen.
+
+<AccordionGroup>
+    <Accordion icon="rectangle-terminal" title="P1-DSMR">
+        ```shell
+        >D
+        ; gPlugD v1.11 DSRM AS3000 (4.7.24)
+        upH=0
+        sr=0
+        ss=0
+
+        rBlink=0
+        d=750
+        bu=0
+        noWifi=0
+        ; define pins
+        rL=6
+        gL=5
+        bL=7
+        butA=9
+        ; shared var within local network
+        g:Pi=0
+        g:Po=0
+
+        >B
+        ->sensor53 r
+        ; enable mDNS
+        ->setOption55 1
+        ;->sensor53 l14
+
+        ;configure GPIO
+        spinm(rL O)
+        spinm(gL O)
+        spinm(bL O)
+        spinm(butA P)
+
+        >BS
+        ; lightshow at startup
+        spin(rL 1)
+        delay(d)
+        spin(gL 1)
+        ; r + g = y
+        delay(d)
+        spin(rL 0)
+        delay(d)
+        spin(gL 0)
+        spin(bL 1)
+        delay(d)
+        spin(bL 0)
+
+        >M 1
+
+        +1,4,o,0,115200
+
+        1,0-0:96.1.1(@1,SM-ID,,SMid,0
+
+        1,=h
+        <hr/>
+        1,=h
+        <h4>Real Power In & Out<h4/>
+            1,1-0:1.7.0(@1,Pi ___ 1⋅7,kW,Pi,19
+            1,1-0:2.7.0(@1,Po ___ 2⋅7,kW,Po,19
+            1,=h
+            <hr/>
+            1,=h
+            <h4>Phase Power In & Out<h4/>
+                1,1-0:21.7.0(@0.001,P1i ___ 21⋅7,W,P1i,16
+                1,1-0:41.7.0(@0.001,P2i ___ 41⋅7,W,P2i,16
+                1,1-0:61.7.0(@0.001,P3i ___ 61⋅7,W,P3i,16
+                ;
+                1,1-0:22.7.0(@0.001,P1o ___ 22⋅7,W,P1o,16
+                1,1-0:42.7.0(@0.001,P2o ___ 42⋅7,W,P2o,16
+                1,1-0:62.7.0(@0.001,P3o ___ 62⋅7,W,P3o,16
+                1,=h
+                <hr/>
+                1,=h
+                <h4>Phase Voltage & Current<h4/>
+                    1,1-0:32.7.0(@1,V1 ___ 32⋅7,V,V1,16
+                    1,1-0:52.7.0(@1,V2 ___ 52⋅7,V,V2,16
+                    1,1-0:72.7.0(@1,V3 ___ 72⋅7,V,V3,16
+                    ;
+                    1,1-0:31.7.0(@100,I1 ___ 31⋅7,A,I1,19
+                    1,1-0:51.7.0(@100,I2 ___ 51⋅7,A,I2,19
+                    1,1-0:71.7.0(@100,I3 ___ 71⋅7,A,I3,19
+                    ;
+                    1,=h
+                    <hr/>
+                    1,=h
+                    <h4>Real Energy Counters<h4/>
+                        1,1-0:1.8.1(@1,Ei1 ___ 1⋅8⋅1,kWh,Ei1,3
+                        1,1-0:1.8.2(@1,Ei2 ___ 1⋅8⋅2,kWh,Ei2,3
+                        1,1-0:2.8.1(@1,Eo1 ___ 2⋅8⋅1,kWh,Eo1,3
+                        1,1-0:2.8.2(@1,Eo2 ___ 2⋅8⋅2,kWh,Eo2,3
+                        #
+
+                        >S
+                        ; every second
+                        sr=sunrise/60
+                        ss=sunset/60
+                        upH=uptime/60
+                        ; share latest Pi & Po
+                        Pi=sml[2]
+                        Po=sml[3]
+
+                        ; if no wifi connection after 10 sec, blink red
+                        if wifis==0 {
+                            noWifi += 1
+                        }
+                        if noWifi>10 {
+                            rBlink = 3
+                        }
+
+                        if pin[butA]==0 {
+                            bu += 1
+                        }
+                        if bu>2 {
+                            rBlink = 1
+                            bu=0
+                        }
+
+                        >F
+                        ; every 100 ms
+
+                        ; blink green on (1⋅7) reception
+                        if smlv[2]==1 {
+                            spin(gL 1)
+                            smlv[0]
+                        } else {
+                            spin(gL 0)
+                        }
+
+                        if rBlink>0 {
+                            spin(rL 1)
+                            rBlink-=1
+                            noWifi=0
+                        } else {
+                            spin(rL 0)
+                        }
+
+                        >W
+                        @
+                        <style>body{font - family: monospace}h4,h2{margin: 0;color: #1fa3ec}td
+                            th{font - weight: normal;}tr th:first-child{text - align: left;}tr
+                            td:nth-child(2){text - align: right;color: lime;font-weight:normal;}table{width:100\%;}</style>
+
+                        @
+                        <table>
+                            <tbody>
+                            <tr>
+                                <th>Date \& Time</th>
+                                <td>%tstamp%</td>
+                            </tr>
+                            <tr>
+                                <th>Uptime</th>
+                                <td> %1upH%h</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        ```
+    </Accordion>
+    <Accordion icon="rectangle-terminal" title="ISKRA-EXT">
+        ```shell
+        >D
+        ; gPlugD v1.11 ISKRA RE (4.7.24)
+        upH=0
+        sr=0
+        ss=0
+
+        d=750
+        noWifi=0
+        rBlink=0
+        bu=0
+        ; define pins
+        gL=5
+        rL=6
+        bL=7
+        butA=9
+        ; shared var within local network
+        g:Pi=0
+        g:Po=0
+
+        >B
+        ->sensor53 r
+        ; activate mDNS
+        ->setOption55 1
+
+        ;configure GPIO
+        spinm(rL O)
+        spinm(gL O)
+        spinm(bL O)
+        spinm(butA P)
+
+        >BS
+        ; lightshow at startup
+        spin(rL 1)
+        delay(d)
+        spin(gL 1)
+        ; r + g = y
+        delay(d)
+        spin(rL 0)
+        delay(d)
+        spin(gL 0)
+        spin(bL 1)
+        delay(d)
+        spin(bL 0)
+
+        >M 1
+        +1,4,r,0,115200,
+        ; no Key:
+        1,=so4,
+
+        1,=h
+        <hr/>
+        ; only one string (@#) can be decoded per meter
+        1,pm(96.1.0)@#,SM-ID ___ 96⋅1⋅0,,SMid,16
+        ;1,pm(96.1.1)@#,someStr ___ 96⋅1⋅1,,someStr,
+
+        1,=h
+        <hr/>
+        1,=h
+        <h4>Real Power In & Out<h4/>
+            1,pm(1.7.0)@1000,Pi ___ 1⋅7,kW,Pi_1.7,19
+            1,pm(2.7.0)@1000,Po ___ 2⋅7,kW,Po_2.7,19
+
+            ; not provided by RE
+            ;1,=h
+            <hr/>
+            ;1,=h
+            <h4>Phase Power In & Out<h4/>
+                ;1,pm(21.7.0)@1,P1i ___ 21⋅7,W,P1i,16
+                ;1,pm(41.7.0)@1,P2i ___ 41⋅7,W,P2i,16
+                ;1,pm(61.7.0)@1,P3i ___ 61⋅7,W,P3i,16
+                ;
+                ;1,pm(22.7.0)@1,P1o ___ 22⋅7,W,P1o,16
+                ;1,pm(42.7.0)@1,P2o ___ 42⋅7,W,P2o,16
+                ;1,pm(62.7.0)@1,P3o ___ 62⋅7,W,P3o,16
+
+                1,=h
+                <hr/>
+                1,=h
+                <h4>Phase Voltage & Current<h4/>
+                    1,pm(32.7.0)@10,V1 ___ 32⋅7,V,V1_32.7,17
+                    1,pm(52.7.0)@10,V2 ___ 52⋅7,V,V2_52.7,17
+                    1,pm(72.7.0)@10,V3 ___ 72⋅7,V,V3_72.7,17
+                    ;
+                    1,pm(31.7.0)@100,I1 ___ 31⋅7,A,I1_31.7,19
+                    1,pm(51.7.0)@100,I2 ___ 51⋅7,A,I2_51.7,19
+                    1,pm(71.7.0)@100,I3 ___ 71⋅7,A,I3_71.7,19
+
+                    1,=h
+                    <hr/>
+                    1,=h
+                    <h4>Real Energy Counters<h4/>
+                        ; MQTT published on teleperiod
+                        1,pm(1.8.0)@1000,Ei ___ 1⋅8,kWh,Ei_1.8,3
+                        1,pm(1.8.1)@1000,Ei1 ___ 1⋅8⋅1,kWh,Ei1_1.8.1,3
+                        1,pm(1.8.2)@1000,Ei2 ___ 1⋅8⋅2,kWh,Ei2_1.8.2,3
+                        ; out
+                        1,pm(2.8.0)@1000,Eo ___ 2⋅8,kWh,Eo_2.8,3
+                        1,pm(2.8.1)@1000,Eo1 ___ 2⋅8⋅1,kWh,Eo1_2.8.1,3
+                        1,pm(2.8.2)@1000,Eo2 ___ 2⋅8⋅2,kWh,Eo2_2.8.2,3
+
+                        >S
+                        ; every second
+                        upH=uptime/60
+                        sr=sunrise/60
+                        ss=sunset/60
+                        ; share latest Pi & Po
+                        Pi=sml[2]
+                        Po=sml[3]
+
+                        ; if no wifi connection after 10 sec, blink red
+                        if wifis==0 {
+                            noWifi += 1
+                        }
+                        if noWifi>10 {
+                            rBlink = 3
+                        }
+
+                        if pin[butA]==0 {
+                            bu += 1
+                        }
+                        if bu>2 {
+                            rBlink = 1
+                            bu=0
+                        }
+
+                        >F
+                        ; every 100 ms
+
+                        ; blink green on (1⋅7) reception
+                        if smlv[2]==1 {
+                            spin(gL 1)
+                            smlv[0]
+                        } else {
+                            spin(gL 0)
+                        }
+
+                        if rBlink>0 {
+                            spin(rL 1)
+                            rBlink-=1
+                            noWifi=0
+                        } else {
+                            spin(rL 0)
+                        }
+
+                        >W
+                        @ISKRA HDLC/DLMS Romande Energie, sample interval 5 s
+                        @
+                        <style>body{font - family: monospace}h4,h2{margin: 0;color: #1fa3ec}td
+                            th{font - weight: normal;}tr th:first-child{text - align: left;}tr
+                            td:nth-child(2){text - align: right;color: lime;font-weight:normal;}table{width:100\%;}</style>
+
+                        @
+                        <table>
+                            <tbody>
+                            <tr>
+                                <th>Date \& Time</th>
+                                <td>%tstamp%</td>
+                            </tr>
+                            <tr>
+                                <th>Uptime</th>
+                                <td> %1upH%h</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        ```
+    </Accordion>
+    <Accordion icon="rectangle-terminal" title="ISKRA-COMPACT">
+        ```shell
+        Bitte senden Sie uns eine Email.
+        ```
+    </Accordion>
+</AccordionGroup>
+
+In diesem Script können auch selbst Anpassungen – z.B. an der Darstellung oder den angezeigten Werten – vorgenommen werden.
+
+Anbei sehen Sie ein Beispiel einer von einem gPlugD mit dem Script erzeugten Webseite, auf der die vom Smart Meter ausgegebenen Daten angezeigt werden.
+
+Mit einer etwas kryptischen [Script](https://tasmota.github.io/docs/Scripting-Language/) Sprache lässt sich der gPlugD auch programmieren. Z.B. für eine Steuerung oder die Berechnung und Anzeige von Daten.
+
+Die [OBIS Codes](https://de.wikipedia.org/wiki/OBIS-Kennzahlen) können Sie im normalen Script anpassen, sofern Ihr Smart Meter andere Daten ausgibt. Die Tasmota Dokumentation für die Konfiguration der Smart Meter CII finden Sie [hier](https://tasmota.github.io/docs/Smart-Meter-Interface/). Es existieren einige Einschränkungen. So kann unseres Wissens z.B. nur ein String ausgelesen werden (nebst den numerischen Werten).
+Für den gPlugD steht nun zusätzlich auch die leistungsfähigere [Berry-Script](https://tasmota.github.io/docs/Berry/) Sprache zur Verfügung.
+
+## Konfiguration von MQTT
+
+Wenn die vom gPlugD empfangenen Daten an einen externen MQTT Broker weiter geleitet werden sollen,
+muss unter _Einstellung->Sonstige Einstellungen_ noch MQTT aktiviert werden. Zudem muss der MQTT-Host etc.
+im neu vorhandenen Menu unter _Einstellungen->MQTT_ noch eingerichtet werden.
+Unter _Einstellungen->Sonstige Konfigurationen_ kann auch der Zugang zum WebUI mit einem Passwort geschützt werden.
+
+## Einbindung in Drittsysteme
+Die Visualisierung der Energiedaten kann via MQTT, InfluxDB und Grafana auf einem externen System erfolgen.
+Alternativ können die Daten via MQTT auch in eines der vielen Home-Automation Systeme (z.B. openHAB, ioBroker,
+Homeassistant, etc.) übergeben werden. Auch die Integration mit Loxone ist möglich.
+
+## Update der Tasmota-Firmware
+Der gPlugD wird mit einer spezifisch kompilierten Tasmota Firmware ausgeliefert.
+Ein Over-the-Air-Update (OTA) der Firmware mit einer Version von der Tasmota Webseite sollte *nicht* durchgeführt werden.
+Dies würde zu einem Verlust der erforderlichen Funktionen führen. Die Standard-Firmware Versionen von Tasmota haben
+die Script-Funktion nicht mit an Board.
+
+Es ist jedoch möglich, die Tasmota-Firmware selbst zu kompilieren und das Scripting
+sowie das Smartmeter Modul hinzuzufügen. Der SerialBuffer (Rx) ist im Standardfall zu klein bemessen,
+um Energiedaten mit 115’200 Baud alle rechtzeitig empfangen & verarbeiten zu können.
+Wir empfehlen eine Grösse von 600 – 1200 bytes.
+
+Sollten Sie die ausgelieferte Tasmota Firmware verloren haben und Ihren gPlug wieder damit ausrüsten wollen,
+können Sie diese per Emailanfrage von uns erhalten.
+
+
+## Elektronik und Bedienelemente
+
+![title](/images/electronic-elements-gplugd.png)
+
+Der _Button-A_ ist mit GPIO-9 verbunden. Er hat für den Betrieb jedoch keine wesentliche Funktion. Im Script kann für seine Zustandsänderung eine Aktion programmiert werden.
+Die Tasmota Konsole lässt sich auch via die USB Buchse des gPlugD erreichen. Wie das klappt, haben wir in einem Blogbeitrag gPlug via USB steuern dokumentiert.
+
+
+## Noch Fragen?
+Welche Daten werden vom Smart Meter und in welcher Form übertragen? Lesen Sie mehr dazu in unserem Blogbeitrag
+[Smart Meter Daten prüfen](https://gplug.ch/blog/smart-meter-daten-pruefen/).
+Die Spezifikation der P1-DSMR Schnittstelle ist [hier](https://www.netbeheernederland.nl/sites/default/files/2024-02/dsmr_5.0.2_p1_companion_standard.pdf) verfügbar.
+Gerne dürfen Sie uns bei Fragen oder technischen Problemen per Mail an [info@gplug.ch](mailto:info@gplug.ch) kontaktieren.
+
+
